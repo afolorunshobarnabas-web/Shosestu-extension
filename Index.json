@@ -1,0 +1,12 @@
+{
+  "scripts": [
+    {
+      "name": "WebNovel",
+      "fileName": "WebNovel.lua",
+      "id": 880101,
+      "lang": "eng",
+      "ver": "1.0.0",
+      "libVer": "1.0.0"
+    }
+  ]
+}
