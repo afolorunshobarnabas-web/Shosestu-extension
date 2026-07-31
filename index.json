@@ -1,11 +1,13 @@
-
 {
+  "scripts": [
     {
+      "name": "WebNovels",
+      "fileName": "WebNovel.lua",
+      "imageURL": "https://m.webnovel.com/favicon.ico",
       "id": 880101,
-      "name": "WebNovel",
-      "version": "1.0.0",
-      "libVersion": "1.0.0",
-      "lang": "eng",
-      "fileName": "WebNovel.lua"
+      "lang": "en",
+      "ver": "1.0.0",
+      "libVer": "1.0.0"
     }
+  ]
 }
