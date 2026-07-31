@@ -1,18 +1,16 @@
--- Extension Information
+-- Extension Information (Shosetsu Metadata)
 id = 880101
 name = "WebNovel"
 baseUrl = "https://m.webnovel.com"
 language = "eng"
 
--- 1. Search / Popular Novels via JSON API
+-- 1. Search / Popular Novels
 function getListing(page, type)
-    -- Fetch JSON directly from WebNovel's API
     local res = GET("https://m.webnovel.com/go/m/api/search/search-result?keyword=shadow&pageIndex=" .. page)
     local data = parseJSON(res:body())
     
     local novels = {}
     
-    -- Check if data exists in the API response
     if data and data.data and data.data.bookItems then
         for _, item in ipairs(data.data.bookItems) do
             table.insert(novels, NovelListing({
@@ -28,28 +26,36 @@ end
 
 -- 2. Novel Details & Chapter List
 function getNovelDetails(novelUrl)
-    -- Extract the book ID from the URL link
     local bookId = novelUrl:match("(%d+)")
+    if not bookId then return nil end
     
-    -- Fetch chapter catalog from internal API
     local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
     local data = parseJSON(res:body())
 
     local chapters = {}
     if data and data.data and data.data.volumeItems then
         for _, volume in ipairs(data.data.volumeItems) do
-            for _, chap in ipairs(volume.chapterItems) do
-                table.insert(chapters, Chapter({
-                    name = chap.chapterName,
-                    link = "/book/" .. bookId .. "/" .. chap.chapterId
-                }))
+            if volume.chapterItems then
+                for _, chap in ipairs(volume.chapterItems) do
+                    table.insert(chapters, Chapter({
+                        name = chap.chapterName,
+                        link = "/book/" .. bookId .. "/" .. chap.chapterId
+                    }))
+                end
             end
         end
     end
 
+    local bookName = "Unknown"
+    local desc = ""
+    if data and data.data and data.data.bookInfo then
+        bookName = data.data.bookInfo.bookName or "Unknown"
+        desc = data.data.bookInfo.description or ""
+    end
+
     return NovelDetails({
-        name = data.data.bookInfo.bookName or "Unknown",
-        description = data.data.bookInfo.description or "",
+        name = bookName,
+        description = desc,
         imageURL = "https://img.webnovel.com/bookcover/" .. bookId .. "/600/600.jpg",
         chapters = chapters
     })
@@ -58,13 +64,17 @@ end
 -- 3. Chapter Content
 function getChapterText(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
+    if not bookId or not chapterId then return "" end
+
     local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
     local data = parseJSON(res:body())
     
     local text = ""
     if data and data.data and data.data.chapterInfo and data.data.chapterInfo.contents then
         for _, paragraph in ipairs(data.data.chapterInfo.contents) do
-            text = text .. paragraph.content .. "\n\n"
+            if paragraph.content then
+                text = text .. paragraph.content .. "\n\n"
+            end
         end
     end
 
