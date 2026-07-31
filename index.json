@@ -1,10 +1,12 @@
-[
-  {
-    "id": 880101,
-    "name": "WebNovel",
-    "version": "1.0.0",
-    "libVersion": "1.0.0",
-    "lang": "eng",
-    "fileName": "WebNovel.lua"
-  }
-]
+
+{
+    {
+      "id": 880101,
+      "name": "WebNovel",
+      "version": "1.0.0",
+      "libVersion": "1.0.0",
+      "lang": "eng",
+      "fileName": "WebNovel.lua"
+    }
+  ]
+}
