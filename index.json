@@ -3,7 +3,7 @@
     {
       "name": "WebNovels",
       "fileName": "WebNovel.lua",
-      "pkgUrl": "https://raw.githubusercontent.com/afolorunshobarnabas-web/Shosetsu-WebNovel/main/src/eng/WebNovel.lua",
+      "pkgURL": "https://raw.githubusercontent.com/afolorunshobarnabas-web/Shosetsu-WebNovel/main/src/eng/WebNovel.lua",
       "imageURL": "https://m.webnovel.com/favicon.ico",
       "id": 880101,
       "lang": "eng",
