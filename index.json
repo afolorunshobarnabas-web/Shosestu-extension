@@ -3,9 +3,10 @@
     {
       "name": "WebNovels",
       "fileName": "WebNovel.lua",
+      "codePath": "src/eng/WebNovel.lua",
       "imageURL": "https://m.webnovel.com/favicon.ico",
       "id": 880101,
-      "lang": "en",
+      "lang": "eng",
       "ver": "1.0.0",
       "libVer": "1.0.0"
     }
