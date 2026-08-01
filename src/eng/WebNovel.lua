@@ -11,11 +11,27 @@ local function safeParseJSON(text)
     return nil
 end
 
+-- Safely extract string body from Shosetsu HttpResponse
+local function getResponseBody(res)
+    if type(res) == "string" then return res end
+    if not res then return "" end
+    
+    -- Shosetsu uses res:string()
+    local success, str = pcall(function() return res:string() end)
+    if success and str then return str end
+
+    -- Fallback check for alternative versions
+    success, str = pcall(function() return res:body() end)
+    if success and str then return str end
+
+    return ""
+end
+
 -- Helper to construct valid Shosetsu Headers objects
 local function getBrowserHeaders()
     local builder = HeadersBuilder()
     builder:set("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-    builder:set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+    builder:set("Accept", "application/json, text/plain, */*")
     return builder:build()
 end
 
@@ -28,32 +44,36 @@ local function performSearch(query, page, filters)
         qStr = query.query or query.text or "shadow"
     end
 
-    local url = "https://m.webnovel.com/search?keywords=" .. qStr
+    local pNum = 1
+    if type(page) == "number" or type(page) == "string" then
+        pNum = page
+    elseif type(page) == "table" then
+        pNum = page.page or 1
+    end
+
+    local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
     local res = GET(url, getBrowserHeaders())
-    local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+    local bodyText = getResponseBody(res)
+    local data = safeParseJSON(bodyText)
     
     local novels = {}
     
-    if bodyText ~= "" then
-        local document = HTML.parse(bodyText)
-        local items = document:select("li.search-item, a.book-item, div.book-li, .g_book_item")
-        
-        for i = 0, items:size() - 1 do
-            local item = items:get(i)
-            local titleEl = item:select(".book-name, .name, h3, .g_book_name"):first()
-            local linkEl = item:select("a"):first()
-            local imgEl = item:select("img"):first()
-            
-            if titleEl and linkEl then
-                local name = titleEl:text()
-                local link = linkEl:attr("href")
-                local img = imgEl and (imgEl:attr("src") or imgEl:attr("data-original")) or ""
+    -- Parse JSON response
+    if data and data.data then
+        local items = data.data.bookItems or data.data.items or data.data.list
+        if items then
+            for _, item in ipairs(items) do
+                local bName = item.bookName or item.name or "Unknown"
+                local bId = item.bookId or item.id or ""
+                local img = item.coverUrl or ("https://img.webnovel.com/bookcover/" .. bId .. "/600/600.jpg")
                 
-                table.insert(novels, NovelListing({
-                    name = name,
-                    link = link,
-                    imageURL = img
-                }))
+                if bId ~= "" then
+                    table.insert(novels, NovelListing({
+                        name = bName,
+                        link = "/book/" .. bId,
+                        imageURL = img
+                    }))
+                end
             end
         end
     end
@@ -61,7 +81,7 @@ local function performSearch(query, page, filters)
     return novels
 end
 
--- Extension Table Definition (Explicit key declaration)
+-- Extension Table Definition
 local extension = {
     id = 880101,
     name = "WebNovel",
@@ -96,7 +116,7 @@ local extension = {
         if not bookId then return nil end
         
         local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId, getBrowserHeaders())
-        local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+        local bodyText = getResponseBody(res)
         local data = safeParseJSON(bodyText)
 
         local chapters = {}
@@ -133,7 +153,7 @@ local extension = {
         if not bookId or not chapterId then return "" end
 
         local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId, getBrowserHeaders())
-        local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+        local bodyText = getResponseBody(res)
         local data = safeParseJSON(bodyText)
         
         local text = ""
