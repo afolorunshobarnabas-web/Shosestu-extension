@@ -2,11 +2,10 @@
   "scripts": [
     {
       "name": "WebNovels",
-      "fileName": "WebNovel.lua",
-      "pkgURL": "https://raw.githubusercontent.com/afolorunshobarnabas-web/Shosetsu-WebNovel/main/src/eng/WebNovel.lua",
+      "fileName": "WebNovel.zip",
       "imageURL": "https://m.webnovel.com/favicon.ico",
       "id": 880101,
-      "lang": "en",
+      "lang": "eng",
       "ver": "1.0.0",
       "libVer": "1.0.0"
     }
