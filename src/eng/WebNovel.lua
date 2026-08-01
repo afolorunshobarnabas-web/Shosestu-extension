@@ -21,9 +21,25 @@ function extension.shrinkURL(fullUrl)
     return fullUrl:gsub("^" .. extension.baseUrl, "")
 end
 
--- 1. Search Function
+-- 1. Search Function (Safely handles strings, numbers, or tables)
 function extension.search(query, page, filters)
-    local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. (query or "shadow") .. "&pageIndex=" .. page
+    -- Safely extract search query string
+    local qStr = "shadow"
+    if type(query) == "string" and query ~= "" then
+        qStr = query
+    elseif type(query) == "table" then
+        qStr = query.query or query.text or "shadow"
+    end
+
+    -- Safely extract page number
+    local pNum = 1
+    if type(page) == "number" or type(page) == "string" then
+        pNum = page
+    elseif type(page) == "table" then
+        pNum = page.page or 1
+    end
+
+    local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. qStr .. "&pageIndex=" .. pNum
     local res = GET(url)
     local data = parseJSON(res:body())
     
