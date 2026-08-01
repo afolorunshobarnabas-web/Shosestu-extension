@@ -2,7 +2,7 @@
   "scripts": [
     {
       "name": "WebNovel",
-      "fileName": "WebNovel.lua",
+      "fileName": "WebNovel",
       "imageURL": "https://m.webnovel.com/favicon.ico",
       "id": 880101,
       "lang": "eng",
