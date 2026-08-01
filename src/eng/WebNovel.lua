@@ -1,17 +1,11 @@
 -- Create local extension table
 local extension = {}
 
--- Extension Information (Notice capital 'URL')
+-- Extension Information
 extension.id = 880101
 extension.name = "WebNovel"
 extension.baseURL = "https://m.webnovel.com"
 extension.language = "eng"
-
--- Standard Headers
-local headers = {
-    ["User-Agent"] = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-    ["Accept"] = "application/json, text/plain, */*"
-}
 
 -- Safe JSON Parser helper
 local function safeParseJSON(text)
@@ -56,9 +50,8 @@ function extension.search(query, page, filters)
         pNum = page.page or 1
     end
 
-    -- Direct search API endpoint
     local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
-    local res = GET(url, headers)
+    local res = GET(url)
     
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
@@ -99,7 +92,7 @@ function extension.parseNovel(novelUrl)
     local bookId = novelUrl:match("(%d+)")
     if not bookId then return nil end
     
-    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId, headers)
+    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
 
@@ -137,7 +130,7 @@ function extension.getPassage(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
     if not bookId or not chapterId then return "" end
 
-    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId, headers)
+    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
     
