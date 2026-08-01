@@ -1,13 +1,13 @@
 -- Create local extension table
 local extension = {}
 
--- Extension Information
+-- Extension Information (Notice capital 'URL')
 extension.id = 880101
 extension.name = "WebNovel"
-extension.baseUrl = "https://m.webnovel.com"
+extension.baseURL = "https://m.webnovel.com"
 extension.language = "eng"
 
--- Standard Browser Headers to pass anti-bot checks
+-- Standard Headers
 local headers = {
     ["User-Agent"] = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
     ["Accept"] = "application/json, text/plain, */*"
@@ -32,12 +32,12 @@ function extension.expandURL(relativeUrl)
     if relativeUrl:find("^https?://") then
         return relativeUrl
     end
-    return extension.baseUrl .. relativeUrl
+    return extension.baseURL .. relativeUrl
 end
 
 function extension.shrinkURL(fullUrl)
     if not fullUrl then return "" end
-    return fullUrl:gsub("^" .. extension.baseUrl, "")
+    return fullUrl:gsub("^" .. extension.baseURL, "")
 end
 
 -- 1. Search Function
@@ -56,7 +56,8 @@ function extension.search(query, page, filters)
         pNum = page.page or 1
     end
 
-    local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. qStr .. "&pageIndex=" .. pNum
+    -- Direct search API endpoint
+    local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
     local res = GET(url, headers)
     
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
@@ -64,24 +65,21 @@ function extension.search(query, page, filters)
     
     local novels = {}
     
-    -- Check common JSON structures returned by WebNovel
-    local items = nil
     if data and data.data then
-        items = data.data.bookItems or data.data.items or data.data.list
-    end
-
-    if items then
-        for _, item in ipairs(items) do
-            local bName = item.bookName or item.name or "Unknown"
-            local bId = item.bookId or item.id or ""
-            local img = item.coverUrl or ("https://img.webnovel.com/bookcover/" .. bId .. "/600/600.jpg")
-            
-            if bId ~= "" then
-                table.insert(novels, NovelListing({
-                    name = bName,
-                    link = "/book/" .. bId,
-                    imageURL = img
-                }))
+        local items = data.data.bookItems or data.data.items or data.data.list
+        if items then
+            for _, item in ipairs(items) do
+                local bName = item.bookName or item.name or "Unknown"
+                local bId = item.bookId or item.id or ""
+                local img = item.coverUrl or ("https://img.webnovel.com/bookcover/" .. bId .. "/600/600.jpg")
+                
+                if bId ~= "" then
+                    table.insert(novels, NovelListing({
+                        name = bName,
+                        link = "/book/" .. bId,
+                        imageURL = img
+                    }))
+                end
             end
         end
     end
