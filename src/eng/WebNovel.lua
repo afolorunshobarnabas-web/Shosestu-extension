@@ -7,7 +7,7 @@ extension.name = "WebNovel"
 extension.baseUrl = "https://m.webnovel.com"
 extension.language = "eng"
 
--- URL Helper Functions required by Shosetsu
+-- URL Helper Functions
 function extension.expandURL(relativeUrl)
     if not relativeUrl then return "" end
     if relativeUrl:find("^https?://") then
@@ -21,9 +21,9 @@ function extension.shrinkURL(fullUrl)
     return fullUrl:gsub("^" .. extension.baseUrl, "")
 end
 
--- 1. Novel Listings (Catalog & Search)
-function extension.listings(page, type)
-    local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=shadow&pageIndex=" .. page
+-- 1. Search Function
+function extension.search(query, page, filters)
+    local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. (query or "shadow") .. "&pageIndex=" .. page
     local res = GET(url)
     local data = parseJSON(res:body())
     
@@ -42,7 +42,14 @@ function extension.listings(page, type)
     return novels
 end
 
--- 2. Novel Details & Chapter List
+-- 2. Define Listings Table
+extension.listings = {
+    Listing("Popular", true, function(page)
+        return extension.search("shadow", page, nil)
+    end)
+}
+
+-- 3. Novel Details & Chapter List
 function extension.parseNovel(novelUrl)
     local bookId = novelUrl:match("(%d+)")
     if not bookId then return nil end
@@ -79,7 +86,7 @@ function extension.parseNovel(novelUrl)
     })
 end
 
--- 3. Chapter Content (Passage Parser)
+-- 4. Chapter Content (Passage Parser)
 function extension.getPassage(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
     if not bookId or not chapterId then return "" end
