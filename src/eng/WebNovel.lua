@@ -7,6 +7,18 @@ extension.name = "WebNovel"
 extension.baseUrl = "https://m.webnovel.com"
 extension.language = "eng"
 
+-- Safe JSON Parser helper
+local function safeParseJSON(text)
+    if json and json.parse then
+        return json.parse(text)
+    elseif json and json.decode then
+        return json.decode(text)
+    elseif parseJSON then
+        return parseJSON(text)
+    end
+    return nil
+end
+
 -- URL Helper Functions
 function extension.expandURL(relativeUrl)
     if not relativeUrl then return "" end
@@ -21,9 +33,8 @@ function extension.shrinkURL(fullUrl)
     return fullUrl:gsub("^" .. extension.baseUrl, "")
 end
 
--- 1. Search Function (Safely handles strings, numbers, or tables)
+-- 1. Search Function
 function extension.search(query, page, filters)
-    -- Safely extract search query string
     local qStr = "shadow"
     if type(query) == "string" and query ~= "" then
         qStr = query
@@ -31,7 +42,6 @@ function extension.search(query, page, filters)
         qStr = query.query or query.text or "shadow"
     end
 
-    -- Safely extract page number
     local pNum = 1
     if type(page) == "number" or type(page) == "string" then
         pNum = page
@@ -41,7 +51,10 @@ function extension.search(query, page, filters)
 
     local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. qStr .. "&pageIndex=" .. pNum
     local res = GET(url)
-    local data = parseJSON(res:body())
+    
+    -- Extract response text safely
+    local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+    local data = safeParseJSON(bodyText)
     
     local novels = {}
     
@@ -71,7 +84,8 @@ function extension.parseNovel(novelUrl)
     if not bookId then return nil end
     
     local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
-    local data = parseJSON(res:body())
+    local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+    local data = safeParseJSON(bodyText)
 
     local chapters = {}
     if data and data.data and data.data.volumeItems then
@@ -108,7 +122,8 @@ function extension.getPassage(chapterUrl)
     if not bookId or not chapterId then return "" end
 
     local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
-    local data = parseJSON(res:body())
+    local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
+    local data = safeParseJSON(bodyText)
     
     local text = ""
     if data and data.data and data.data.chapterInfo and data.data.chapterInfo.contents then
