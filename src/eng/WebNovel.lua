@@ -7,6 +7,15 @@ extension.name = "WebNovel"
 extension.baseURL = "https://m.webnovel.com"
 extension.language = "eng"
 
+-- Helper to construct valid Shosetsu Headers objects
+local function getBrowserHeaders()
+    local builder = HeadersBuilder()
+    builder:set("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+    builder:set("Accept", "application/json, text/plain, */*")
+    builder:set("Referer", "https://m.webnovel.com/")
+    return builder:build()
+end
+
 -- Safe JSON Parser helper
 local function safeParseJSON(text)
     if not text or text == "" then return nil end
@@ -51,7 +60,7 @@ function extension.search(query, page, filters)
     end
 
     local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
-    local res = GET(url)
+    local res = GET(url, getBrowserHeaders())
     
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
@@ -92,7 +101,7 @@ function extension.parseNovel(novelUrl)
     local bookId = novelUrl:match("(%d+)")
     if not bookId then return nil end
     
-    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
+    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId, getBrowserHeaders())
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
 
@@ -130,7 +139,7 @@ function extension.getPassage(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
     if not bookId or not chapterId then return "" end
 
-    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
+    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId, getBrowserHeaders())
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
     
