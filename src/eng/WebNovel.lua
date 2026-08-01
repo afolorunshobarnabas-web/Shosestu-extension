@@ -7,8 +7,15 @@ extension.name = "WebNovel"
 extension.baseUrl = "https://m.webnovel.com"
 extension.language = "eng"
 
+-- Standard Browser Headers to pass anti-bot checks
+local headers = {
+    ["User-Agent"] = "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    ["Accept"] = "application/json, text/plain, */*"
+}
+
 -- Safe JSON Parser helper
 local function safeParseJSON(text)
+    if not text or text == "" then return nil end
     if json and json.parse then
         return json.parse(text)
     elseif json and json.decode then
@@ -50,21 +57,32 @@ function extension.search(query, page, filters)
     end
 
     local url = "https://m.webnovel.com/go/m/api/search/search-result?keyword=" .. qStr .. "&pageIndex=" .. pNum
-    local res = GET(url)
+    local res = GET(url, headers)
     
-    -- Extract response text safely
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
     
     local novels = {}
     
-    if data and data.data and data.data.bookItems then
-        for _, item in ipairs(data.data.bookItems) do
-            table.insert(novels, NovelListing({
-                name = item.bookName,
-                link = "/book/" .. item.bookId,
-                imageURL = "https://img.webnovel.com/bookcover/" .. item.bookId .. "/600/600.jpg"
-            }))
+    -- Check common JSON structures returned by WebNovel
+    local items = nil
+    if data and data.data then
+        items = data.data.bookItems or data.data.items or data.data.list
+    end
+
+    if items then
+        for _, item in ipairs(items) do
+            local bName = item.bookName or item.name or "Unknown"
+            local bId = item.bookId or item.id or ""
+            local img = item.coverUrl or ("https://img.webnovel.com/bookcover/" .. bId .. "/600/600.jpg")
+            
+            if bId ~= "" then
+                table.insert(novels, NovelListing({
+                    name = bName,
+                    link = "/book/" .. bId,
+                    imageURL = img
+                }))
+            end
         end
     end
 
@@ -83,7 +101,7 @@ function extension.parseNovel(novelUrl)
     local bookId = novelUrl:match("(%d+)")
     if not bookId then return nil end
     
-    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
+    local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId, headers)
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
 
@@ -93,8 +111,8 @@ function extension.parseNovel(novelUrl)
             if volume.chapterItems then
                 for _, chap in ipairs(volume.chapterItems) do
                     table.insert(chapters, Chapter({
-                        name = chap.chapterName,
-                        link = "/book/" .. bookId .. "/" .. chap.chapterId
+                        name = chap.chapterName or "Chapter",
+                        link = "/book/" .. bookId .. "/" .. (chap.chapterId or "")
                     }))
                 end
             end
@@ -121,7 +139,7 @@ function extension.getPassage(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
     if not bookId or not chapterId then return "" end
 
-    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
+    local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId, headers)
     local bodyText = type(res) == "string" and res or (res and res.body and res:body()) or ""
     local data = safeParseJSON(bodyText)
     
