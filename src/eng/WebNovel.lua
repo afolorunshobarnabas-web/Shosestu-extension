@@ -1,11 +1,11 @@
 -- Extension Information (Shosetsu Metadata)
 id = 880101
 name = "WebNovel"
-baseUrl = "https://m.webnovel.com"
+local baseUrl = "https://m.webnovel.com"
 language = "eng"
 
 -- 1. Search / Popular Novels
-function getListing(page, type)
+local function getListing(page, type)
     local res = GET("https://m.webnovel.com/go/m/api/search/search-result?keyword=shadow&pageIndex=" .. page)
     local data = parseJSON(res:body())
     
@@ -25,7 +25,7 @@ function getListing(page, type)
 end
 
 -- 2. Novel Details & Chapter List
-function getNovelDetails(novelUrl)
+local function getNovelDetails(novelUrl)
     local bookId = novelUrl:match("(%d+)")
     if not bookId then return nil end
     
@@ -62,7 +62,7 @@ function getNovelDetails(novelUrl)
 end
 
 -- 3. Chapter Content
-function getChapterText(chapterUrl)
+local function getChapterText(chapterUrl)
     local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
     if not bookId or not chapterId then return "" end
 
