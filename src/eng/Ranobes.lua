@@ -1,21 +1,20 @@
--- Safe Response Body Extractor
+-- Safe Body Text Extractor
 local function getResponseBody(res)
-    if not res then return "" end
+    if res == nil then return "" end
     if type(res) == "string" then return res end
     
-    -- Try reading standard methods if it's a response object
     if type(res) == "userdata" or type(res) == "table" then
         local success, str = pcall(function() return res:string() end)
-        if success and str then return str end
+        if success and str and str ~= "" then return str end
         
         success, str = pcall(function() return res:body() end)
-        if success and str then return str end
+        if success and str and str ~= "" then return str end
     end
     
     return tostring(res)
 end
 
--- Standard browser headers
+-- Browser Headers
 local function getBrowserHeaders()
     local builder = HeadersBuilder()
     builder:set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -23,39 +22,45 @@ local function getBrowserHeaders()
     return builder:build()
 end
 
--- Parse novel listings from HTML
+-- Parse Novel List
 local function parseNovelList(bodyText)
     local novels = {}
-    if not bodyText or bodyText == "" then return novels end
+    if bodyText == nil or bodyText == "" or type(bodyText) ~= "string" then 
+        return novels 
+    end
 
-    local document = HTML.parse(bodyText)
+    local success, document = pcall(function() return HTML.parse(bodyText) end)
+    if not success or not document then return novels end
+
     local items = document:select("article.story, div.story, div.block.story, .short-story")
+    if not items then return novels end
 
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        
-        local titleEl = item:select("h2.title a, h3.title a, a.title, .title a"):first()
-        local imgEl = item:select("img"):first()
+        if item then
+            local titleEl = item:select("h2.title a, h3.title a, a.title, .title a"):first()
+            local imgEl = item:select("img"):first()
 
-        if titleEl then
-            local name = titleEl:text()
-            if not name or name == "" then
-                name = titleEl:attr("title")
-            end
+            if titleEl then
+                local name = titleEl:text()
+                if not name or name == "" then
+                    name = titleEl:attr("title")
+                end
 
-            local link = titleEl:attr("href")
-            local img = ""
+                local link = titleEl:attr("href")
+                local img = ""
 
-            if imgEl then
-                img = imgEl:attr("src") or imgEl:attr("data-src") or imgEl:attr("data-original") or ""
-            end
+                if imgEl then
+                    img = imgEl:attr("src") or imgEl:attr("data-src") or imgEl:attr("data-original") or ""
+                end
 
-            if link and link ~= "" and name and name ~= "" then
-                table.insert(novels, NovelListing({
-                    name = name,
-                    link = link,
-                    imageURL = img
-                }))
+                if link and link ~= "" and name and name ~= "" then
+                    table.insert(novels, NovelListing({
+                        name = name,
+                        link = link,
+                        imageURL = img
+                    }))
+                end
             end
         end
     end
@@ -122,29 +127,34 @@ local extension = {
         local desc = ""
         local imgUrl = ""
 
-        if bodyText ~= "" then
-            local document = HTML.parse(bodyText)
-            
-            local titleEl = document:select("h1.title, h1"):first()
-            if titleEl then bookName = titleEl:text() end
+        if bodyText and bodyText ~= "" then
+            local success, document = pcall(function() return HTML.parse(bodyText) end)
+            if success and document then
+                local titleEl = document:select("h1.title, h1"):first()
+                if titleEl then bookName = titleEl:text() end
 
-            local descEl = document:select("div.moreless-text, div.description, div.entry-content"):first()
-            if descEl then desc = descEl:text() end
+                local descEl = document:select("div.moreless-text, div.description, div.entry-content"):first()
+                if descEl then desc = descEl:text() end
 
-            local imgEl = document:select("div.poster img, .story-poster img"):first()
-            if imgEl then imgUrl = imgEl:attr("src") or imgEl:attr("data-src") or "" end
+                local imgEl = document:select("div.poster img, .story-poster img"):first()
+                if imgEl then imgUrl = imgEl:attr("src") or imgEl:attr("data-src") or "" end
 
-            local chapItems = document:select("div.chapters-list a, ul.chapters-scroll li a, a.chapter-item")
-            for i = 0, chapItems:size() - 1 do
-                local chap = chapItems:get(i)
-                local cName = chap:text()
-                local cLink = chap:attr("href")
+                local chapItems = document:select("div.chapters-list a, ul.chapters-scroll li a, a.chapter-item")
+                if chapItems then
+                    for i = 0, chapItems:size() - 1 do
+                        local chap = chapItems:get(i)
+                        if chap then
+                            local cName = chap:text()
+                            local cLink = chap:attr("href")
 
-                if cLink and cLink ~= "" then
-                    table.insert(chapters, Chapter({
-                        name = cName,
-                        link = cLink
-                    }))
+                            if cLink and cLink ~= "" then
+                                table.insert(chapters, Chapter({
+                                    name = cName,
+                                    link = cLink
+                                }))
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -164,15 +174,20 @@ local extension = {
 
         local text = ""
 
-        if bodyText ~= "" then
-            local document = HTML.parse(bodyText)
-            local paragraphEls = document:select("div#arrArticle p, div.text p, div.entry-content p")
-
-            for i = 0, paragraphEls:size() - 1 do
-                local p = paragraphEls:get(i)
-                local pText = p:text()
-                if pText and pText ~= "" then
-                    text = text .. pText .. "\n\n"
+        if bodyText and bodyText ~= "" then
+            local success, document = pcall(function() return HTML.parse(bodyText) end)
+            if success and document then
+                local paragraphEls = document:select("div#arrArticle p, div.text p, div.entry-content p")
+                if paragraphEls then
+                    for i = 0, paragraphEls:size() - 1 do
+                        local p = paragraphEls:get(i)
+                        if p then
+                            local pText = p:text()
+                            if pText and pText ~= "" then
+                                text = text .. pText .. "\n\n"
+                            end
+                        end
+                    end
                 end
             end
         end
