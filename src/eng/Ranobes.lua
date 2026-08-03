@@ -14,7 +14,7 @@ local function getResponseBody(res)
     return tostring(res)
 end
 
--- Browser Headers
+-- Standard Browser Headers
 local function getBrowserHeaders()
     local builder = HeadersBuilder()
     builder:set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -22,7 +22,7 @@ local function getBrowserHeaders()
     return builder:build()
 end
 
--- Parse Novel List
+-- Parse Novel Listings from HTML
 local function parseNovelList(bodyText)
     local novels = {}
     if bodyText == nil or bodyText == "" or type(bodyText) ~= "string" then 
@@ -32,13 +32,14 @@ local function parseNovelList(bodyText)
     local success, document = pcall(function() return HTML.parse(bodyText) end)
     if not success or not document then return novels end
 
-    local items = document:select("article.story, div.story, div.block.story, .short-story")
+    -- Catch all Ranobes story card variations
+    local items = document:select("article, div.short-story, div.story, div.block_story, div.block")
     if not items then return novels end
 
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item then
-            local titleEl = item:select("h2.title a, h3.title a, a.title, .title a"):first()
+            local titleEl = item:select("h2.title a, h3.title a, .title a, a[href*='/novels/']"):first()
             local imgEl = item:select("img"):first()
 
             if titleEl then
@@ -51,10 +52,10 @@ local function parseNovelList(bodyText)
                 local img = ""
 
                 if imgEl then
-                    img = imgEl:attr("src") or imgEl:attr("data-src") or imgEl:attr("data-original") or ""
+                    img = imgEl:attr("data-src") or imgEl:attr("src") or imgEl:attr("data-original") or ""
                 end
 
-                if link and link ~= "" and name and name ~= "" then
+                if link and link ~= "" and name and name ~= "" and link:find("/novels/") then
                     table.insert(novels, NovelListing({
                         name = name,
                         link = link,
@@ -107,9 +108,10 @@ local extension = {
                 pNum = page.page or 1
             end
 
-            local url = "https://ranobes.top/"
+            -- Point directly to the main novels directory
+            local url = "https://ranobes.top/novels/"
             if pNum > 1 then
-                url = "https://ranobes.top/page/" .. pNum .. "/"
+                url = "https://ranobes.top/novels/page/" .. pNum .. "/"
             end
 
             local res = GET(url, getBrowserHeaders())
