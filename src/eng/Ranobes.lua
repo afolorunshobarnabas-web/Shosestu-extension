@@ -1,23 +1,37 @@
--- Robust HTTP Response Body Extractor
-local function getResponseBody(res)
+-- Helper to execute HTTP requests using Shosetsu's network client
+local function fetchHTML(url, headers)
+    local req
+    if headers then
+        req = GET(url, headers)
+    else
+        req = GET(url)
+    end
+
+    local res = nil
+    -- Execute the request through Shosetsu's OkHttp client
+    if client then
+        local success, response = pcall(function()
+            return client:newCall(req):execute()
+        end)
+        if success and response then
+            res = response
+        end
+    end
+
+    if not res then
+        res = req
+    end
+
     if res == nil then return "" end
     if type(res) == "string" then return res end
 
-    -- 1. OkHttp Response: res:body():string()
-    local success, str = pcall(function() return res:body():string() end)
-    if success and type(str) == "string" and str ~= "" then return str end
-
-    -- 2. Alternative wrapper method: res:text()
-    success, str = pcall(function() return res:text() end)
-    if success and type(str) == "string" and str ~= "" then return str end
-
-    -- 3. Property access: res.body
-    success, str = pcall(function() return res.body end)
-    if success and type(str) == "string" and str ~= "" then return str end
-
-    -- 4. Direct method: res:string()
-    success, str = pcall(function() return res:string() end)
-    if success and type(str) == "string" and str ~= "" then return str end
+    -- Extract body string from OkHttp Response object
+    local success, bodyStr = pcall(function()
+        return res:body():string()
+    end)
+    if success and type(bodyStr) == "string" and bodyStr ~= "" then
+        return bodyStr
+    end
 
     return ""
 end
@@ -99,8 +113,8 @@ local extension = {
         end
 
         local url = "https://ranobes.top/index.php?do=search&subaction=search&story=" .. qStr
-        local res = GET(url)
-        return parseNovelList(getResponseBody(res))
+        local bodyText = fetchHTML(url)
+        return parseNovelList(bodyText)
     end,
 
     listings = {
@@ -117,15 +131,14 @@ local extension = {
                 url = "https://ranobes.top/novels/page/" .. pNum .. "/"
             end
 
-            local res = GET(url)
-            return parseNovelList(getResponseBody(res))
+            local bodyText = fetchHTML(url)
+            return parseNovelList(bodyText)
         end)
     },
 
     parseNovel = function(novelUrl)
         local fullUrl = extension.expandURL(novelUrl)
-        local res = GET(fullUrl)
-        local bodyText = getResponseBody(res)
+        local bodyText = fetchHTML(fullUrl)
 
         local chapters = {}
         local bookName = "Unknown Title"
@@ -174,8 +187,7 @@ local extension = {
 
     getPassage = function(chapterUrl)
         local fullUrl = extension.expandURL(chapterUrl)
-        local res = GET(fullUrl)
-        local bodyText = getResponseBody(res)
+        local bodyText = fetchHTML(fullUrl)
 
         local text = ""
 
