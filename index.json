@@ -1,13 +1,13 @@
 {
-  "extensions": [
+  "scripts": [
     {
-      "id": 880101,
       "name": "Ranobes",
-      "version": "1.0.1",
-      "path": "Ranobes.lua",
-      "language": "eng",
-      "baseURL": "https://ranobes.top",
-      "imgURL": "https://ranobes.top/templates/ranobes/images/logo.png"
+      "fileName": "Ranobes",
+      "imageURL": "https://ranobes.top/templates/ranobes/images/logo.png",
+      "id": 880101,
+      "lang": "eng",
+      "ver": "1.0.1",
+      "libVer": "1.0.0"
     }
   ]
 }
