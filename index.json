@@ -1,11 +1,13 @@
-[
-  {
-    "id": 880101,
-    "name": "Ranobes",
-    "version": "1.0.1",
-    "path": "Ranobes.lua",
-    "language": "eng",
-    "baseURL": "https://ranobes.top",
-    "imgURL": "https://ranobes.top/templates/ranobes/images/logo.png"
-  }
-]
+{
+  "extensions": [
+    {
+      "id": 880101,
+      "name": "Ranobes",
+      "version": "1.0.1",
+      "path": "Ranobes.lua",
+      "language": "eng",
+      "baseURL": "https://ranobes.top",
+      "imgURL": "https://ranobes.top/templates/ranobes/images/logo.png"
+    }
+  ]
+}
