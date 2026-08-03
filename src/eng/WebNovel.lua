@@ -28,7 +28,6 @@ end
 -- Public Web Feed Request Worker
 local function fetchPublicFeed(page)
     local pNum = page or 1
-    -- Public category feed endpoint (Fantasy / Popular novels)
     local url = "https://m.webnovel.com/go/m/api/book/getCategoryBookList?categoryType=1&pageIndex=" .. pNum .. "&pageSize=20"
     
     local res = GET(url)
@@ -80,7 +79,6 @@ local extension = {
     end,
 
     search = function(query, page, filters)
-        -- Fallback feed query for general browsing
         return fetchPublicFeed(page)
     end,
 
@@ -129,7 +127,7 @@ local extension = {
 
     getPassage = function(chapterUrl)
         local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
-        if not bookId or not chapterId me then return "" end
+        if not bookId or not chapterId then return "" end
 
         local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
         local bodyText = getResponseBody(res)
