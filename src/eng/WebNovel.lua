@@ -11,38 +11,42 @@ local function safeParseJSON(text)
     return nil
 end
 
--- Safely extract string body from Shosetsu HttpResponse
+-- Safely extract response text
 local function getResponseBody(res)
     if type(res) == "string" then return res end
     if not res then return "" end
-    
     local success, str = pcall(function() return res:string() end)
     if success and str then return str end
-
-    success, str = pcall(function() return res:body() end)
-    if success and str then return str end
-
     return ""
 end
 
--- Public Web Feed Request Worker
-local function fetchPublicFeed(page)
-    -- Safely extract page number from number, string, or table
+-- WebView Request Worker
+local function fetchWithWebView(url)
+    -- web.get uses the WebView browser engine to bypass Cloudflare checks
+    local res = web and web.get and web.get(url) or GET(url)
+    return getResponseBody(res)
+end
+
+local function performSearch(query, page)
     local pNum = 1
     if type(page) == "number" or type(page) == "string" then
         pNum = page
     elseif type(page) == "table" then
-        pNum = page.page or page.pageIndex or 1
+        pNum = page.page or 1
     end
 
-    local url = "https://m.webnovel.com/go/m/api/book/getCategoryBookList?categoryType=1&pageIndex=" .. pNum .. "&pageSize=20"
-    
-    local res = GET(url)
-    local bodyText = getResponseBody(res)
+    local qStr = "shadow"
+    if type(query) == "string" and query ~= "" then
+        qStr = query
+    elseif type(query) == "table" then
+        qStr = query.query or query.text or "shadow"
+    end
+
+    local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
+    local bodyText = fetchWithWebView(url)
     local data = safeParseJSON(bodyText)
     
     local novels = {}
-    
     if data and data.data then
         local items = data.data.bookItems or data.data.items or data.data.list
         if items then
@@ -65,7 +69,7 @@ local function fetchPublicFeed(page)
     return novels
 end
 
--- Extension Table Definition
+-- Extension Table
 local extension = {
     id = 880101,
     name = "WebNovel",
@@ -74,9 +78,7 @@ local extension = {
 
     expandURL = function(relativeUrl)
         if not relativeUrl then return "" end
-        if relativeUrl:find("^https?://") then
-            return relativeUrl
-        end
+        if relativeUrl:find("^https?://") then return relativeUrl end
         return "https://m.webnovel.com" .. relativeUrl
     end,
 
@@ -86,12 +88,12 @@ local extension = {
     end,
 
     search = function(query, page, filters)
-        return fetchPublicFeed(page)
+        return performSearch(query, page)
     end,
 
     listings = {
-        Listing("Popular Feed", true, function(page)
-            return fetchPublicFeed(page)
+        Listing("Popular", true, function(page)
+            return performSearch("shadow", page)
         end)
     },
 
@@ -99,8 +101,7 @@ local extension = {
         local bookId = novelUrl:match("(%d+)")
         if not bookId then return nil end
         
-        local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
-        local bodyText = getResponseBody(res)
+        local bodyText = fetchWithWebView("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
         local data = safeParseJSON(bodyText)
 
         local chapters = {}
@@ -136,8 +137,7 @@ local extension = {
         local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
         if not bookId or not chapterId then return "" end
 
-        local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
-        local bodyText = getResponseBody(res)
+        local bodyText = fetchWithWebView("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
         local data = safeParseJSON(bodyText)
         
         local text = ""
