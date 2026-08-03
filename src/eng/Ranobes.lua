@@ -1,36 +1,13 @@
--- Helper to execute HTTP requests using Shosetsu's network client
-local function fetchHTML(url, headers)
-    local req
-    if headers then
-        req = GET(url, headers)
-    else
-        req = GET(url)
-    end
-
-    local res = nil
-    -- Execute the request through Shosetsu's OkHttp client
-    if client then
-        local success, response = pcall(function()
-            return client:newCall(req):execute()
-        end)
-        if success and response then
-            res = response
-        end
-    end
-
-    if not res then
-        res = req
-    end
-
+-- Safe Body Text Extractor for OkHttp Responses
+local function getResponseBody(res)
     if res == nil then return "" end
     if type(res) == "string" then return res end
 
-    -- Extract body string from OkHttp Response object
-    local success, bodyStr = pcall(function()
+    local success, str = pcall(function()
         return res:body():string()
     end)
-    if success and type(bodyStr) == "string" and bodyStr ~= "" then
-        return bodyStr
+    if success and type(str) == "string" then
+        return str
     end
 
     return ""
@@ -39,20 +16,16 @@ end
 -- Parse Novel Listings from HTML
 local function parseNovelList(bodyText)
     local novels = {}
-    if bodyText == nil or bodyText == "" or type(bodyText) ~= "string" then 
+    if not bodyText or bodyText == "" or type(bodyText) ~= "string" then 
         return novels 
     end
 
     local success, document = pcall(function() return HTML.parse(bodyText) end)
     if not success or not document then return novels end
 
-    -- Target Ranobes story blocks
-    local items = document:select("div.block_story, article.story, div.short-story, div.story")
-    if not items or items:size() == 0 then
-        items = document:select("article, div.block")
-    end
-
-    if not items then return novels end
+    -- Selector targets Ranobes story card containers
+    local items = document:select("div.block_story, article.story, div.short-story, div.story, div.block")
+    if not items or items:size() == 0 then return novels end
 
     for i = 0, items:size() - 1 do
         local item = items:get(i)
@@ -113,8 +86,8 @@ local extension = {
         end
 
         local url = "https://ranobes.top/index.php?do=search&subaction=search&story=" .. qStr
-        local bodyText = fetchHTML(url)
-        return parseNovelList(bodyText)
+        local res = GET(url)
+        return parseNovelList(getResponseBody(res))
     end,
 
     listings = {
@@ -131,14 +104,15 @@ local extension = {
                 url = "https://ranobes.top/novels/page/" .. pNum .. "/"
             end
 
-            local bodyText = fetchHTML(url)
-            return parseNovelList(bodyText)
+            local res = GET(url)
+            return parseNovelList(getResponseBody(res))
         end)
     },
 
     parseNovel = function(novelUrl)
         local fullUrl = extension.expandURL(novelUrl)
-        local bodyText = fetchHTML(fullUrl)
+        local res = GET(fullUrl)
+        local bodyText = getResponseBody(res)
 
         local chapters = {}
         local bookName = "Unknown Title"
@@ -187,7 +161,8 @@ local extension = {
 
     getPassage = function(chapterUrl)
         local fullUrl = extension.expandURL(chapterUrl)
-        local bodyText = fetchHTML(fullUrl)
+        local res = GET(fullUrl)
+        local bodyText = getResponseBody(res)
 
         local text = ""
 
