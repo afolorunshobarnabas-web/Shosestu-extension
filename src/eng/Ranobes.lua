@@ -14,14 +14,6 @@ local function getResponseBody(res)
     return tostring(res)
 end
 
--- Standard Browser Headers
-local function getBrowserHeaders()
-    local builder = HeadersBuilder()
-    builder:set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    builder:set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-    return builder:build()
-end
-
 -- Parse Novel Listings from HTML
 local function parseNovelList(bodyText)
     local novels = {}
@@ -32,14 +24,18 @@ local function parseNovelList(bodyText)
     local success, document = pcall(function() return HTML.parse(bodyText) end)
     if not success or not document then return novels end
 
-    -- Catch all Ranobes story card variations
-    local items = document:select("article, div.short-story, div.story, div.block_story, div.block")
+    -- Selector targets Ranobes DataLife Engine story blocks
+    local items = document:select("div.block_story, article.story, div.short-story, div.story")
+    if not items or items:size() == 0 then
+        items = document:select("article, div.block")
+    end
+
     if not items then return novels end
 
     for i = 0, items:size() - 1 do
         local item = items:get(i)
         if item then
-            local titleEl = item:select("h2.title a, h3.title a, .title a, a[href*='/novels/']"):first()
+            local titleEl = item:select(".title_story a, h2.title a, h3.title a, .title a, a[href*='/novels/']"):first()
             local imgEl = item:select("img"):first()
 
             if titleEl then
@@ -55,7 +51,7 @@ local function parseNovelList(bodyText)
                     img = imgEl:attr("data-src") or imgEl:attr("src") or imgEl:attr("data-original") or ""
                 end
 
-                if link and link ~= "" and name and name ~= "" and link:find("/novels/") then
+                if link and link ~= "" and name and name ~= "" then
                     table.insert(novels, NovelListing({
                         name = name,
                         link = link,
@@ -95,7 +91,7 @@ local extension = {
         end
 
         local url = "https://ranobes.top/index.php?do=search&subaction=search&story=" .. qStr
-        local res = GET(url, getBrowserHeaders())
+        local res = GET(url)
         return parseNovelList(getResponseBody(res))
     end,
 
@@ -108,20 +104,19 @@ local extension = {
                 pNum = page.page or 1
             end
 
-            -- Point directly to the main novels directory
             local url = "https://ranobes.top/novels/"
             if pNum > 1 then
                 url = "https://ranobes.top/novels/page/" .. pNum .. "/"
             end
 
-            local res = GET(url, getBrowserHeaders())
+            local res = GET(url)
             return parseNovelList(getResponseBody(res))
         end)
     },
 
     parseNovel = function(novelUrl)
         local fullUrl = extension.expandURL(novelUrl)
-        local res = GET(fullUrl, getBrowserHeaders())
+        local res = GET(fullUrl)
         local bodyText = getResponseBody(res)
 
         local chapters = {}
@@ -171,7 +166,7 @@ local extension = {
 
     getPassage = function(chapterUrl)
         local fullUrl = extension.expandURL(chapterUrl)
-        local res = GET(fullUrl, getBrowserHeaders())
+        local res = GET(fullUrl)
         local bodyText = getResponseBody(res)
 
         local text = ""
