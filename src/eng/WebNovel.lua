@@ -27,7 +27,14 @@ end
 
 -- Public Web Feed Request Worker
 local function fetchPublicFeed(page)
-    local pNum = page or 1
+    -- Safely extract page number from number, string, or table
+    local pNum = 1
+    if type(page) == "number" or type(page) == "string" then
+        pNum = page
+    elseif type(page) == "table" then
+        pNum = page.page or page.pageIndex or 1
+    end
+
     local url = "https://m.webnovel.com/go/m/api/book/getCategoryBookList?categoryType=1&pageIndex=" .. pNum .. "&pageSize=20"
     
     local res = GET(url)
