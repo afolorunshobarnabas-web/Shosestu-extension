@@ -1,16 +1,3 @@
--- Safe JSON Parser helper
-local function safeParseJSON(text)
-    if not text or text == "" then return nil end
-    if json and json.parse then
-        return json.parse(text)
-    elseif json and json.decode then
-        return json.decode(text)
-    elseif parseJSON then
-        return parseJSON(text)
-    end
-    return nil
-end
-
 -- Extract response body safely
 local function getResponseBody(res)
     if type(res) == "string" then return res end
@@ -20,11 +7,11 @@ local function getResponseBody(res)
     return ""
 end
 
--- Helper for standard browser headers
+-- Standard browser headers
 local function getBrowserHeaders()
     local builder = HeadersBuilder()
-    builder:set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    builder:set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+    builder:set("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+    builder:set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
     return builder:build()
 end
 
@@ -34,19 +21,30 @@ local function parseNovelList(bodyText)
     if bodyText == "" then return novels end
 
     local document = HTML.parse(bodyText)
-    local items = document:select("article.story, div.block.story")
+    -- Target all story container variations on Ranobes
+    local items = document:select("article.story, div.story, div.block.story, .short-story")
 
     for i = 0, items:size() - 1 do
         local item = items:get(i)
-        local titleEl = item:select("h2.title a, h3.title a, .title a"):first()
-        local imgEl = item:select("div.image img, img"):first()
+        
+        -- Try grabbing link/title
+        local titleEl = item:select("h2.title a, h3.title a, a.title, .title a"):first()
+        local imgEl = item:select("img"):first()
 
         if titleEl then
             local name = titleEl:text()
-            local link = titleEl:attr("href")
-            local img = imgEl and (imgEl:attr("src") or imgEl:attr("data-src")) or ""
+            if not name or name == "" then
+                name = titleEl:attr("title")
+            end
 
-            if link and link ~= "" then
+            local link = titleEl:attr("href")
+            local img = ""
+
+            if imgEl then
+                img = imgEl:attr("src") or imgEl:attr("data-src") or imgEl:attr("data-original") or ""
+            end
+
+            if link and link ~= "" and name and name ~= "" then
                 table.insert(novels, NovelListing({
                     name = name,
                     link = link,
@@ -59,7 +57,6 @@ local function parseNovelList(bodyText)
     return novels
 end
 
--- Extension Table Definition
 local extension = {
     id = 880101,
     name = "Ranobes",
@@ -78,13 +75,6 @@ local extension = {
     end,
 
     search = function(query, page)
-        local pNum = 1
-        if type(page) == "number" or type(page) == "string" then
-            pNum = page
-        elseif type(page) == "table" then
-            pNum = page.page or 1
-        end
-
         local qStr = ""
         if type(query) == "string" then
             qStr = query
@@ -93,10 +83,6 @@ local extension = {
         end
 
         local url = "https://ranobes.top/index.php?do=search&subaction=search&story=" .. qStr
-        if pNum > 1 then
-            url = url .. "&search_start=" .. pNum
-        end
-
         local res = GET(url, getBrowserHeaders())
         return parseNovelList(getResponseBody(res))
     end,
@@ -110,9 +96,10 @@ local extension = {
                 pNum = page.page or 1
             end
 
-            local url = "https://ranobes.top/novels/"
+            -- Ranobes primary feed URL
+            local url = "https://ranobes.top/"
             if pNum > 1 then
-                url = "https://ranobes.top/novels/page/" .. pNum .. "/"
+                url = "https://ranobes.top/page/" .. pNum .. "/"
             end
 
             local res = GET(url, getBrowserHeaders())
@@ -133,16 +120,15 @@ local extension = {
         if bodyText ~= "" then
             local document = HTML.parse(bodyText)
             
-            local titleEl = document:select("h1.title, h1.bold"):first()
+            local titleEl = document:select("h1.title, h1"):first()
             if titleEl then bookName = titleEl:text() end
 
-            local descEl = document:select("div.moreless-text, div.description"):first()
+            local descEl = document:select("div.moreless-text, div.description, div.entry-content"):first()
             if descEl then desc = descEl:text() end
 
-            local imgEl = document:select("div.poster img"):first()
+            local imgEl = document:select("div.poster img, .story-poster img"):first()
             if imgEl then imgUrl = imgEl:attr("src") or imgEl:attr("data-src") or "" end
 
-            -- Parse chapter entries
             local chapItems = document:select("div.chapters-list a, ul.chapters-scroll li a, a.chapter-item")
             for i = 0, chapItems:size() - 1 do
                 local chap = chapItems:get(i)
