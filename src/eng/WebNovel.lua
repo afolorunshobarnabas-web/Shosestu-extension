@@ -28,58 +28,34 @@ local function getBrowserHeaders()
     return builder:build()
 end
 
--- 1. Search & Popular Worker Function
-local function performSearch(query, page)
-    local pNum = 1
-    if type(page) == "number" or type(page) == "string" then
-        pNum = page
-    elseif type(page) == "table" then
-        pNum = page.page or 1
-    end
-
-    local qStr = "shadow"
-    if type(query) == "string" and query ~= "" then
-        qStr = query
-    elseif type(query) == "table" then
-        qStr = query.query or query.text or "shadow"
-    end
-
-    -- Query URL handling
-    local url = "https://freewebnovel.com/search/?searchkey=" .. qStr
-    if pNum > 1 then
-        url = "https://freewebnovel.com/search/" .. qStr .. "/" .. pNum .. ".html"
-    end
-
-    local res = GET(url, getBrowserHeaders())
-    local bodyText = getResponseBody(res)
-    
+-- Helper to parse novel listings from HTML page
+local function parseNovelList(bodyText)
     local novels = {}
+    if bodyText == "" then return novels end
 
-    if bodyText ~= "" then
-        local document = HTML.parse(bodyText)
-        local items = document:select("div.li-row, div.con, div.pic")
+    local document = HTML.parse(bodyText)
+    local items = document:select("div.li-row")
 
-        for i = 0, items:size() - 1 do
-            local item = items:get(i)
-            local titleEl = item:select(".tit a, .title a, h3 a"):first()
-            local imgEl = item:select("img"):first()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        local titleEl = item:select("h3.tit a, .title a, .tit a"):first()
+        local imgEl = item:select("div.pic img"):first()
 
-            if titleEl then
-                local name = titleEl:attr("title")
-                if not name or name == "" then
-                    name = titleEl:text()
-                end
+        if titleEl then
+            local name = titleEl:attr("title")
+            if not name or name == "" then
+                name = titleEl:text()
+            end
 
-                local link = titleEl:attr("href")
-                local img = imgEl and (imgEl:attr("src") or imgEl:attr("data-original")) or ""
+            local link = titleEl:attr("href")
+            local img = imgEl and (imgEl:attr("src") or imgEl:attr("data-original")) or ""
 
-                if link and link ~= "" then
-                    table.insert(novels, NovelListing({
-                        name = name,
-                        link = link,
-                        imageURL = img
-                    }))
-                end
+            if link and link ~= "" then
+                table.insert(novels, NovelListing({
+                    name = name,
+                    link = link,
+                    imageURL = img
+                }))
             end
         end
     end
@@ -106,12 +82,45 @@ local extension = {
     end,
 
     search = function(query, page, filters)
-        return performSearch(query, page)
+        local pNum = 1
+        if type(page) == "number" or type(page) == "string" then
+            pNum = page
+        elseif type(page) == "table" then
+            pNum = page.page or 1
+        end
+
+        local qStr = ""
+        if type(query) == "string" then
+            qStr = query
+        elseif type(query) == "table" then
+            qStr = query.query or query.text or ""
+        end
+
+        local url = "https://freewebnovel.com/search/?searchkey=" .. qStr
+        if pNum > 1 then
+            url = "https://freewebnovel.com/search/" .. qStr .. "/" .. pNum .. ".html"
+        end
+
+        local res = GET(url, getBrowserHeaders())
+        return parseNovelList(getResponseBody(res))
     end,
 
     listings = {
         Listing("Popular", true, function(page)
-            return performSearch("shadow", page)
+            local pNum = 1
+            if type(page) == "number" or type(page) == "string" then
+                pNum = page
+            elseif type(page) == "table" then
+                pNum = page.page or 1
+            end
+
+            local url = "https://freewebnovel.com/most-popular-novel/"
+            if pNum > 1 then
+                url = "https://freewebnovel.com/most-popular-novel/" .. pNum .. ".html"
+            end
+
+            local res = GET(url, getBrowserHeaders())
+            return parseNovelList(getResponseBody(res))
         end)
     },
 
@@ -128,7 +137,6 @@ local extension = {
         if bodyText ~= "" then
             local document = HTML.parse(bodyText)
             
-            -- Extract Novel Info
             local titleEl = document:select("h1.tit, h1.book-name"):first()
             if titleEl then bookName = titleEl:text() end
 
@@ -138,7 +146,6 @@ local extension = {
             local imgEl = document:select("div.pic img, div.book-img img"):first()
             if imgEl then imgUrl = imgEl:attr("src") or imgEl:attr("data-original") or "" end
 
-            -- Extract Chapter List
             local chapItems = document:select("div.m-newest2 ul.ul-list5 li a, div.more-list ul li a, ul.chapter-list li a")
             for i = 0, chapItems:size() - 1 do
                 local chap = chapItems:get(i)
