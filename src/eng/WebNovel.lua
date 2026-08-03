@@ -16,49 +16,27 @@ local function getResponseBody(res)
     if type(res) == "string" then return res end
     if not res then return "" end
     
-    -- Shosetsu uses res:string()
     local success, str = pcall(function() return res:string() end)
     if success and str then return str end
 
-    -- Fallback check for alternative versions
     success, str = pcall(function() return res:body() end)
     if success and str then return str end
 
     return ""
 end
 
--- Helper to construct valid Shosetsu Headers objects
-local function getBrowserHeaders()
-    local builder = HeadersBuilder()
-    builder:set("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-    builder:set("Accept", "application/json, text/plain, */*")
-    return builder:build()
-end
-
--- Define search worker
-local function performSearch(query, page, filters)
-    local qStr = "shadow"
-    if type(query) == "string" and query ~= "" then
-        qStr = query
-    elseif type(query) == "table" then
-        qStr = query.query or query.text or "shadow"
-    end
-
-    local pNum = 1
-    if type(page) == "number" or type(page) == "string" then
-        pNum = page
-    elseif type(page) == "table" then
-        pNum = page.page or 1
-    end
-
-    local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
-    local res = GET(url, getBrowserHeaders())
+-- Public Web Feed Request Worker
+local function fetchPublicFeed(page)
+    local pNum = page or 1
+    -- Public category feed endpoint (Fantasy / Popular novels)
+    local url = "https://m.webnovel.com/go/m/api/book/getCategoryBookList?categoryType=1&pageIndex=" .. pNum .. "&pageSize=20"
+    
+    local res = GET(url)
     local bodyText = getResponseBody(res)
     local data = safeParseJSON(bodyText)
     
     local novels = {}
     
-    -- Parse JSON response
     if data and data.data then
         local items = data.data.bookItems or data.data.items or data.data.list
         if items then
@@ -102,12 +80,13 @@ local extension = {
     end,
 
     search = function(query, page, filters)
-        return performSearch(query, page, filters)
+        -- Fallback feed query for general browsing
+        return fetchPublicFeed(page)
     end,
 
     listings = {
-        Listing("Popular", true, function(page)
-            return performSearch("shadow", page, nil)
+        Listing("Popular Feed", true, function(page)
+            return fetchPublicFeed(page)
         end)
     },
 
@@ -115,7 +94,7 @@ local extension = {
         local bookId = novelUrl:match("(%d+)")
         if not bookId then return nil end
         
-        local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId, getBrowserHeaders())
+        local res = GET("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
         local bodyText = getResponseBody(res)
         local data = safeParseJSON(bodyText)
 
@@ -150,9 +129,9 @@ local extension = {
 
     getPassage = function(chapterUrl)
         local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
-        if not bookId or not chapterId then return "" end
+        if not bookId or not chapterId me then return "" end
 
-        local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId, getBrowserHeaders())
+        local res = GET("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
         local bodyText = getResponseBody(res)
         local data = safeParseJSON(bodyText)
         
