@@ -11,7 +11,7 @@ local function safeParseJSON(text)
     return nil
 end
 
--- Safely extract response text
+-- Safely extract string body from Shosetsu HttpResponse
 local function getResponseBody(res)
     if type(res) == "string" then return res end
     if not res then return "" end
@@ -20,13 +20,15 @@ local function getResponseBody(res)
     return ""
 end
 
--- WebView Request Worker
-local function fetchWithWebView(url)
-    -- web.get uses the WebView browser engine to bypass Cloudflare checks
-    local res = web and web.get and web.get(url) or GET(url)
-    return getResponseBody(res)
+-- Helper to construct valid Shosetsu Headers objects
+local function getBrowserHeaders()
+    local builder = HeadersBuilder()
+    builder:set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    builder:set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+    return builder:build()
 end
 
+-- 1. Search & Popular Worker Function
 local function performSearch(query, page)
     local pNum = 1
     if type(page) == "number" or type(page) == "string" then
@@ -42,23 +44,39 @@ local function performSearch(query, page)
         qStr = query.query or query.text or "shadow"
     end
 
-    local url = "https://m.webnovel.com/go/m/api/search/search-result?keywords=" .. qStr .. "&pageIndex=" .. pNum
-    local bodyText = fetchWithWebView(url)
-    local data = safeParseJSON(bodyText)
+    -- Query URL handling
+    local url = "https://freewebnovel.com/search/?searchkey=" .. qStr
+    if pNum > 1 then
+        url = "https://freewebnovel.com/search/" .. qStr .. "/" .. pNum .. ".html"
+    end
+
+    local res = GET(url, getBrowserHeaders())
+    local bodyText = getResponseBody(res)
     
     local novels = {}
-    if data and data.data then
-        local items = data.data.bookItems or data.data.items or data.data.list
-        if items then
-            for _, item in ipairs(items) do
-                local bName = item.bookName or item.name or "Unknown"
-                local bId = item.bookId or item.id or ""
-                local img = item.coverUrl or ("https://img.webnovel.com/bookcover/" .. bId .. "/600/600.jpg")
-                
-                if bId ~= "" then
+
+    if bodyText ~= "" then
+        local document = HTML.parse(bodyText)
+        local items = document:select("div.li-row, div.con, div.pic")
+
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            local titleEl = item:select(".tit a, .title a, h3 a"):first()
+            local imgEl = item:select("img"):first()
+
+            if titleEl then
+                local name = titleEl:attr("title")
+                if not name or name == "" then
+                    name = titleEl:text()
+                end
+
+                local link = titleEl:attr("href")
+                local img = imgEl and (imgEl:attr("src") or imgEl:attr("data-original")) or ""
+
+                if link and link ~= "" then
                     table.insert(novels, NovelListing({
-                        name = bName,
-                        link = "/book/" .. bId,
+                        name = name,
+                        link = link,
                         imageURL = img
                     }))
                 end
@@ -69,22 +87,22 @@ local function performSearch(query, page)
     return novels
 end
 
--- Extension Table
+-- Extension Table Definition
 local extension = {
     id = 880101,
     name = "WebNovel",
-    baseURL = "https://m.webnovel.com",
+    baseURL = "https://freewebnovel.com",
     language = "eng",
 
     expandURL = function(relativeUrl)
         if not relativeUrl then return "" end
         if relativeUrl:find("^https?://") then return relativeUrl end
-        return "https://m.webnovel.com" .. relativeUrl
+        return "https://freewebnovel.com" .. relativeUrl
     end,
 
     shrinkURL = function(fullUrl)
         if not fullUrl then return "" end
-        return fullUrl:gsub("^https://m%.webnovel%.com", "")
+        return fullUrl:gsub("^https://freewebnovel%.com", "")
     end,
 
     search = function(query, page, filters)
@@ -98,53 +116,69 @@ local extension = {
     },
 
     parseNovel = function(novelUrl)
-        local bookId = novelUrl:match("(%d+)")
-        if not bookId then return nil end
-        
-        local bodyText = fetchWithWebView("https://m.webnovel.com/go/m/api/book/getChapterList?bookId=" .. bookId)
-        local data = safeParseJSON(bodyText)
+        local fullUrl = extension.expandURL(novelUrl)
+        local res = GET(fullUrl, getBrowserHeaders())
+        local bodyText = getResponseBody(res)
 
         local chapters = {}
-        if data and data.data and data.data.volumeItems then
-            for _, volume in ipairs(data.data.volumeItems) do
-                if volume.chapterItems then
-                    for _, chap in ipairs(volume.chapterItems) do
-                        table.insert(chapters, Chapter({
-                            name = chap.chapterName or "Chapter",
-                            link = "/book/" .. bookId .. "/" .. (chap.chapterId or "")
-                        }))
-                    end
+        local bookName = "Unknown Title"
+        local desc = ""
+        local imgUrl = ""
+
+        if bodyText ~= "" then
+            local document = HTML.parse(bodyText)
+            
+            -- Extract Novel Info
+            local titleEl = document:select("h1.tit, h1.book-name"):first()
+            if titleEl then bookName = titleEl:text() end
+
+            local descEl = document:select("div.inner, div.description, div.m-desc"):first()
+            if descEl then desc = descEl:text() end
+
+            local imgEl = document:select("div.pic img, div.book-img img"):first()
+            if imgEl then imgUrl = imgEl:attr("src") or imgEl:attr("data-original") or "" end
+
+            -- Extract Chapter List
+            local chapItems = document:select("div.m-newest2 ul.ul-list5 li a, div.more-list ul li a, ul.chapter-list li a")
+            for i = 0, chapItems:size() - 1 do
+                local chap = chapItems:get(i)
+                local cName = chap:attr("title")
+                if not cName or cName == "" then cName = chap:text() end
+
+                local cLink = chap:attr("href")
+                if cLink and cLink ~= "" then
+                    table.insert(chapters, Chapter({
+                        name = cName,
+                        link = cLink
+                    }))
                 end
             end
-        end
-
-        local bookName = "Unknown"
-        local desc = ""
-        if data and data.data and data.data.bookInfo then
-            bookName = data.data.bookInfo.bookName or "Unknown"
-            desc = data.data.bookInfo.description or ""
         end
 
         return NovelDetails({
             name = bookName,
             description = desc,
-            imageURL = "https://img.webnovel.com/bookcover/" .. bookId .. "/600/600.jpg",
+            imageURL = imgUrl,
             chapters = chapters
         })
     end,
 
     getPassage = function(chapterUrl)
-        local bookId, chapterId = chapterUrl:match("/book/(%d+)/(%d+)")
-        if not bookId or not chapterId then return "" end
+        local fullUrl = extension.expandURL(chapterUrl)
+        local res = GET(fullUrl, getBrowserHeaders())
+        local bodyText = getResponseBody(res)
 
-        local bodyText = fetchWithWebView("https://m.webnovel.com/go/m/api/chapter/getContent?bookId=" .. bookId .. "&chapterId=" .. chapterId)
-        local data = safeParseJSON(bodyText)
-        
         local text = ""
-        if data and data.data and data.data.chapterInfo and data.data.chapterInfo.contents then
-            for _, paragraph in ipairs(data.data.chapterInfo.contents) do
-                if paragraph.content then
-                    text = text .. paragraph.content .. "\n\n"
+
+        if bodyText ~= "" then
+            local document = HTML.parse(bodyText)
+            local paragraphEls = document:select("div.txt p, div.p-text p, div.chapter-entity p")
+
+            for i = 0, paragraphEls:size() - 1 do
+                local p = paragraphEls:get(i)
+                local pText = p:text()
+                if pText and pText ~= "" then
+                    text = text .. pText .. "\n\n"
                 end
             end
         end
